@@ -61,4 +61,26 @@ public final class AnalizadorTransporte {
     public static Map<String, Long> salidasPorEstacion(List<Registro> registros, boolean paralelo) {
         return contarPor(registros, ES_SALIDA, Registro::estacion, paralelo);
     }
+
+    // b) Horas pico
+
+    public static Map<Integer, Long> flujoPorHora(List<Registro> registros, boolean paralelo) {
+        return contarPor(registros, TODOS, Registro::hora, paralelo);
+    }
+
+    // Umbral relativo al máximo: con un número fijo, el criterio dejaría de servir al cambiar el volumen.
+    public static List<Map.Entry<Integer, Long>> horasPico(Map<Integer, Long> flujoPorHora, double factor) {
+        long maximo = flujoPorHora.values().stream().mapToLong(Long::longValue).max().orElse(0L);
+        Predicate<Map.Entry<Integer, Long>> esHoraPico = alcanzaUmbral(factor * maximo);
+        return flujoPorHora.entrySet().stream()
+                .filter(esHoraPico)
+                .sorted(Map.Entry.<Integer, Long>comparingByValue().reversed()
+                        .thenComparing(Map.Entry.comparingByKey()))
+                .map(entrada -> Map.entry(entrada.getKey(), entrada.getValue()))
+                .toList();
+    }
+
+    public static <K> Predicate<Map.Entry<K, Long>> alcanzaUmbral(double umbral) {
+        return entrada -> entrada.getValue() >= umbral;
+    }
 }
