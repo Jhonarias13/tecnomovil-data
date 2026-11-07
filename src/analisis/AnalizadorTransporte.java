@@ -163,4 +163,36 @@ public final class AnalizadorTransporte {
                                 Collectors.averagingLong(Desplazamiento::minutos)),
                         Map::copyOf));
     }
+
+    // f) Detección de sobrecarga en rutas
+
+    // Se evalúa la hora más cargada y no el total del día: la sobrecarga ocurre en franjas, no en promedio.
+    public static List<EstadoRuta> detectarSobrecarga(List<Registro> registros,
+                                                      Map<String, Integer> capacidadPorRuta,
+                                                      double umbral,
+                                                      boolean paralelo) {
+        Map<String, Map<Integer, Long>> ingresosPorRutaYHora = flujo(registros, paralelo)
+                .filter(ES_ENTRADA)
+                .collect(Collectors.groupingBy(Registro::ruta,
+                        Collectors.groupingBy(Registro::hora, Collectors.counting())));
+
+        return ingresosPorRutaYHora.entrySet().stream()
+                .map(evaluadorDeRuta(capacidadPorRuta, umbral))
+                .sorted(Comparator.comparingDouble(EstadoRuta::ocupacion).reversed()
+                        .thenComparing(EstadoRuta::ruta))
+                .toList();
+    }
+
+    static Function<Map.Entry<String, Map<Integer, Long>>, EstadoRuta> evaluadorDeRuta(
+            Map<String, Integer> capacidadPorRuta, double umbral) {
+        return entrada -> {
+            Map.Entry<Integer, Long> horaMasCargada = entrada.getValue().entrySet().stream()
+                    .max(Map.Entry.<Integer, Long>comparingByValue().thenComparing(Map.Entry.comparingByKey()))
+                    .orElseThrow();
+            int capacidad = capacidadPorRuta.getOrDefault(entrada.getKey(), CAPACIDAD_POR_DEFECTO);
+            double ocupacion = (double) horaMasCargada.getValue() / capacidad;
+            return new EstadoRuta(entrada.getKey(), horaMasCargada.getKey(), horaMasCargada.getValue(),
+                    capacidad, ocupacion, ocupacion > umbral);
+        };
+    }
 }
