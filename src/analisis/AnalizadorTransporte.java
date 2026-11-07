@@ -83,4 +83,14 @@ public final class AnalizadorTransporte {
     public static <K> Predicate<Map.Entry<K, Long>> alcanzaUmbral(double umbral) {
         return entrada -> entrada.getValue() >= umbral;
     }
+
+    // c) Rutas más utilizadas
+
+    public static List<Map.Entry<String, Long>> rutasMasUtilizadas(List<Registro> registros, int n, boolean paralelo) {
+        Function<List<Registro>, Map<String, Long>> contarIngresosPorRuta =
+                datos -> contarPor(datos, ES_ENTRADA, Registro::ruta, paralelo);
+        return contarIngresosPorRuta
+                .andThen(AnalizadorTransporte.<String>topN(n))
+                .apply(registros);
+    }
 }
