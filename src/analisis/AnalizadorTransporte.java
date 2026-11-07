@@ -114,4 +114,53 @@ public final class AnalizadorTransporte {
                 .mapToObj(estaciones::get)
                 .toList();
     }
+
+    // e) Tiempo promedio entre estaciones
+
+    // Salida → entrada es tiempo de espera entre viajes, no de recorrido; por eso solo cuenta entrada → salida.
+    private static final BiPredicate<Registro, Registro> ES_VIAJE = (actual, siguiente) ->
+            ES_ENTRADA.test(actual)
+                    && ES_SALIDA.test(siguiente)
+                    && !actual.estacion().equals(siguiente.estacion());
+
+    public static List<Desplazamiento> desplazamientos(List<Registro> registros, boolean paralelo) {
+        Map<String, List<Registro>> porUsuario = flujo(registros, paralelo)
+                .collect(Collectors.groupingBy(Registro::idUsuario));
+        return flujo(porUsuario.values(), paralelo)
+                .flatMap(registrosUsuario -> desplazamientosDeUsuario(registrosUsuario).stream())
+                .toList();
+    }
+
+    public static List<Desplazamiento> desplazamientosDeUsuario(List<Registro> registrosUsuario) {
+        List<Registro> ordenados = registrosUsuario.stream()
+                .sorted(Registro.ORDEN_CRONOLOGICO)
+                .toList();
+        return IntStream.range(0, Math.max(ordenados.size() - 1, 0))
+                .filter(i -> ES_VIAJE.test(ordenados.get(i), ordenados.get(i + 1)))
+                .mapToObj(i -> crearDesplazamiento(ordenados.get(i), ordenados.get(i + 1)))
+                .toList();
+    }
+
+    private static Desplazamiento crearDesplazamiento(Registro origen, Registro destino) {
+        return new Desplazamiento(
+                origen.idUsuario(),
+                new Tramo(origen.estacion(), destino.estacion()),
+                Duration.between(origen.timestamp(), destino.timestamp()).toMinutes());
+    }
+
+    // Minutos en long: la suma es exacta y el promedio no varía entre secuencial y paralelo.
+    public static double tiempoPromedioMinutos(List<Desplazamiento> desplazamientos) {
+        return desplazamientos.stream()
+                .mapToLong(Desplazamiento::minutos)
+                .average()
+                .orElse(0.0);
+    }
+
+    public static Map<Tramo, Double> tiempoPromedioPorTramo(List<Desplazamiento> desplazamientos, boolean paralelo) {
+        return flujo(desplazamientos, paralelo)
+                .collect(Collectors.collectingAndThen(
+                        Collectors.groupingBy(Desplazamiento::tramo,
+                                Collectors.averagingLong(Desplazamiento::minutos)),
+                        Map::copyOf));
+    }
 }
