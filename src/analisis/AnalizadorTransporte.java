@@ -195,4 +195,22 @@ public final class AnalizadorTransporte {
                     capacidad, ocupacion, ocupacion > umbral);
         };
     }
+
+    public static ResumenDiario analizar(List<Registro> registros, Configuracion configuracion, boolean paralelo) {
+        // Se calculan una sola vez porque los usan dos indicadores cada uno.
+        Map<Integer, Long> flujoHora = flujoPorHora(registros, paralelo);
+        List<Desplazamiento> viajes = desplazamientos(registros, paralelo);
+        return new ResumenDiario(
+                registros.size(),
+                afluenciaPorEstacion(registros, paralelo),
+                salidasPorEstacion(registros, paralelo),
+                flujoHora,
+                horasPico(flujoHora, configuracion.factorHoraPico()),
+                rutasMasUtilizadas(registros, configuracion.topRutas(), paralelo),
+                patronesPorUsuario(registros, paralelo),
+                tiempoPromedioMinutos(viajes),
+                tiempoPromedioPorTramo(viajes, paralelo),
+                detectarSobrecarga(registros, configuracion.capacidadPorRuta(),
+                        configuracion.umbralSobrecarga(), paralelo));
+    }
 }
