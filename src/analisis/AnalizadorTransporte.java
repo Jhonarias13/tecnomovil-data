@@ -93,4 +93,25 @@ public final class AnalizadorTransporte {
                 .andThen(AnalizadorTransporte.<String>topN(n))
                 .apply(registros);
     }
+
+    // d) Patrones de viaje por usuario
+
+    // groupingBy (no el concurrente) respeta el orden de encuentro también en paralelo.
+    public static Map<String, List<String>> patronesPorUsuario(List<Registro> registros, boolean paralelo) {
+        return flujo(registros, paralelo)
+                .collect(Collectors.collectingAndThen(
+                        Collectors.groupingBy(Registro::idUsuario,
+                                Collectors.collectingAndThen(
+                                        Collectors.mapping(Registro::estacion, Collectors.toList()),
+                                        AnalizadorTransporte::sinRepetidosConsecutivos)),
+                        Map::copyOf));
+    }
+
+    // Al salir y volver a entrar en la misma estación aparece dos veces seguidas; se deja una.
+    public static List<String> sinRepetidosConsecutivos(List<String> estaciones) {
+        return IntStream.range(0, estaciones.size())
+                .filter(i -> i == 0 || !estaciones.get(i).equals(estaciones.get(i - 1)))
+                .mapToObj(estaciones::get)
+                .toList();
+    }
 }
